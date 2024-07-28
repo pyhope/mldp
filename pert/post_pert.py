@@ -1,0 +1,115 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Jan 12 00:21:17 2021
+
+@author: jiedeng
+"""
+
+import ase.io.lammpsdata
+import numpy as np
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--file","-f",default='mgsio3.dump',help="input  file")
+parser.add_argument("--format","-ft",default='dump',help="input  file")
+parser.add_argument("--break_if_hit_min","-b",default=False,action='store_true',help="default: DO NOT break_if_hit_min")
+
+args   = parser.parse_args()
+
+file = args.file
+#file = '/Users/jiedeng/GD/papers/paperxx4_ml/post_nn/generate_new_poscar/new/re_4k_p2/mgsio3.dump'
+
+cutoffs = {'MgMg': 1.2, 'MgSi': 1.15, 'MgO': 1.1, 
+           'SiSi': 1.2, 'SiO':  1.1, 'OO': 0.9}
+
+if args.format == 'dump':
+    struct = ase.io.read(file,format='lammps-dump-text',index=0)
+elif args.format == 'vasp':
+    struct = ase.io.read(file,format='vasp')
+elif args.format == 'lmp':
+    struct = ase.io.read(file,format='lammps-data',style='atomic')
+else:
+    print('format not supported!')
+  
+pos = struct.positions
+Zs = struct.get_atomic_numbers() 
+
+n_mg = len(Zs[Zs==Zs[0]]);  idx_mg = range(0,n_mg); 
+n_si = len(Zs[Zs==Zs[1]]);  idx_si = range(n_mg,n_mg+n_si)
+n_o  = len(Zs[Zs==Zs[2]]);   idx_o  = range(n_mg+n_si,n_mg+n_si+n_o)
+
+def get_min_dist(dist,idx0,idx1,label='MgMg'):
+    mindist = np.inf
+    for i in idx0:
+        for j in idx1:
+            if i < j and dist[i,j] <mindist:
+#                print(dist[i,j])
+                mindist = dist[i,j]   
+#    print('***'*10)
+#    print(label,i,j,mindist)
+    return mindist
+
+#struct = ase.io.read('/Users/jiedeng/GD/papers/paperxx4_ml/post_nn/generate_new_poscar/50000.vasp',format='vasp')
+#get_min_dist(struct.get_all_distances(mic=True),range(160),range(160))
+
+idx = []
+dist = struct.get_all_distances(mic=True)
+for ii in range(100000):
+    try:
+        print('--'*20)
+        print(ii)
+        
+        if args.format == 'dump':
+            struct = ase.io.read(file,format='lammps-dump-text',index=ii)
+        elif args.format == 'vasp':
+            struct = ase.io.read(file,format='vasp',index=ii)
+        elif args.format == 'lmp':
+            struct = ase.io.read(file,format='lammps-data',style='atomic',index=ii)
+        else:
+            print('format not supported!')
+
+        dist=struct.get_all_distances(mic=True)
+        mindist = get_min_dist(dist,idx_mg,idx_mg,label='MgMg')             
+        if mindist < cutoffs['MgMg']:
+            print('MgMg ', mindist)
+            if args.break_if_hit_min:
+                raise ValueError('MgMg ', mindist)
+
+        mindist = get_min_dist(dist,idx_mg,idx_si,label='MgSi')             
+        if mindist < cutoffs['MgSi']:
+            print('MgSi ', mindist)
+            if args.break_if_hit_min: 
+                raise ValueError('MgSi ', mindist)
+
+        mindist = get_min_dist(dist,idx_mg,idx_o,label='MgO')             
+        if mindist < cutoffs['MgO']:
+            print('MgO ', mindist)
+            if args.break_if_hit_min: 
+                raise ValueError('MgO ', mindist)
+
+        mindist = get_min_dist(dist,idx_si,idx_si,label='SiSi')             
+        if mindist < cutoffs['SiSi']:
+            print("SiSi ", mindist)
+            if args.break_if_hit_min: 
+                raise ValueError("SiSi ", mindist)
+
+        mindist = get_min_dist(dist,idx_si,idx_o,label='SiO')             
+        if mindist < cutoffs['SiO']:
+            print("SiO ", mindist)
+            if args.break_if_hit_min: 
+                raise ValueError("SiO ", mindist)
+
+        mindist = get_min_dist(dist,idx_o,idx_o,label='OO')             
+        if mindist < cutoffs['OO']:
+            print("OO ", mindist)
+            if args.break_if_hit_min: 
+                raise ValueError("OO ", mindist)
+            
+        idx.append(ii)
+    except:
+        print(ii)
+        break
+        
+print('done')
+print(idx)
