@@ -163,7 +163,10 @@ def build_deepmd_frames(path,outcar,deepmd):
         print("index file provided")
         idx = np.loadtxt(args.idx).astype(int)
         print("split train and test by ratio {0} : {1}".format(args.train_test_ratio,1))
-        idx2_full = [i for i in range(len(ls)) if i not in idx] # test
+        idx2_full = [] # test
+        for i in range(len(ls)):
+            if i not in idx and i > min(idx):
+                idx2_full.append(i)
         test_size = round(len(idx)/args.train_test_ratio)
         idx2 = np.random.choice(idx2_full, test_size, replace=False)
     else:

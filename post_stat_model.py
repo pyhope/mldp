@@ -143,14 +143,23 @@ for path in paths:
     logfile  = os.path.join(deepmd_path,'log.'+args.detail_file)
     natoms = np.loadtxt(os.path.join(deepmd_path,'type.raw')).shape[0]  #assume natoms does not change
     if os.path.exists(os.path.join(deepmd_path,'set.000')):
-        boxs = np.load(os.path.join(deepmd_path,'set.000/box.npy')) #box may shape may vary from frame to frame => NPT, MPMT
-    else:
-        boxs = np.load(os.path.join(deepmd_path,'set.001/box.npy'))
-    box = boxs[0]
-    a = box[:3]
-    b = box[3:6]
-    c = box[6:]
-    vol = np.dot(c,np.cross(a,b))
+        vol_tr = []
+        boxes = np.load(os.path.join(deepmd_path,'set.000/box.npy')) #box may shape may vary from frame to frame => NPT, MPMT
+        for box in boxes:
+            a = box[:3]
+            b = box[3:6]
+            c = box[6:]
+            vol = np.dot(c,np.cross(a,b))
+            vol_tr.append(vol)
+    if os.path.exists(os.path.join(deepmd_path,'set.001')):
+        vol_test = []
+        boxes = np.load(os.path.join(deepmd_path,'set.001/box.npy'))
+        for box in boxes:
+            a = box[:3]
+            b = box[3:6]
+            c = box[6:]
+            vol = np.dot(c,np.cross(a,b))
+            vol_test.append(vol)
 
     e_tr_file  =  os.path.join(deepmd_path,args.detail_file+".e.tr.out")
     f_tr_file  =  os.path.join(deepmd_path,args.detail_file+".f.tr.out")
@@ -179,8 +188,9 @@ for path in paths:
             e_tr = np.reshape(e_tr,(1,len(e_tr)))
         if v_tr.ndim == 1:
             v_tr = np.reshape(v_tr,(1,len(v_tr)))
-        v_gpa_tr = v_tr/vol*eV_A3_2_GPa 
-
+        v_gpa_tr = np.zeros_like(v_tr)
+        for index, vol in enumerate(vol_tr):
+            v_gpa_tr[index] = v_tr[index]/vol*eV_A3_2_GPa
 
     if test_exist:        
         e_test = np.loadtxt(e_test_file)/natoms
@@ -192,7 +202,10 @@ for path in paths:
         if v_test.ndim == 1:
             v_test = np.reshape(v_test,(1,len(v_test)))
         # force cannot be 1 d datal as it is for every atom
-        v_gpa_test = v_test/vol*eV_A3_2_GPa            
+        v_gpa_test = np.zeros_like(v_test)
+        for index, vol in enumerate(vol_test):
+            v_gpa_test[index] = v_test[index]/vol*eV_A3_2_GPa
+
  
     log = np.loadtxt(logfile)
     logdict= {'path':path, 'natoms':log[0]}
