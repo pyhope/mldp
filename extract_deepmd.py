@@ -20,6 +20,7 @@ parser.add_argument("--deepmd","-d",type = str, default = 'deepmd', help="deepmd
 parser.add_argument("--idx","-id",type = str, help="idx file, idx[0] >= 0")
 parser.add_argument('--savetest',"-st", default=True, action='store_false',help="Default: save test as set.001? ")
 parser.add_argument('--inf_ttr',"-it", default=False, action='store_true',help="Infinite ttr")
+parser.add_argument('--test_other',"-to", default=False, action='store_true',help="Test all other frames that are not in the training set")
 parser.add_argument('--force_limit',"-fl", type=float,nargs="+",help="force limit max and min, order does not matter.")
 parser.add_argument('--exclude',"-ex", type=int,nargs="+",help="manually exclude indexs")
 parser.add_argument('--elements',"-e", type=str,nargs="+",help="impose element list")
@@ -176,6 +177,10 @@ def build_deepmd_frames(path,outcar,deepmd):
         idx.sort()
         idx2 = [i for i in range(len(ls)) if i not in idx] # test
 
+    if args.test_other:
+        print("test all other frames that are not in the training set")
+        idx2 = [i for i in range(len(ls)) if i not in idx]
+    
     ls2  = ls.sub_system(idx2) # test
     ls   = ls.sub_system(idx)
         
