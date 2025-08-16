@@ -22,6 +22,7 @@ parser.add_argument("--temperature","-t",default=4000,type=int,help="simulation 
 parser.add_argument("--step","-s",default=1,type=int,help="step")
 parser.add_argument("--range","-r",type=str,help="0-2, means from 0 to 2, default is for all folders")
 parser.add_argument("--recal_dir_name","-rd",default='recal',help="recal directory name")
+parser.add_argument("--spin","-sp",action='store_true',help="add magmom and nupdown (IS Fe) in INCAR, default is False")
 # parser.add_argument("--run_vasp","-rv",help="run vasp?, default without input is Yes")
 # parser.add_argument("--sub_command","-sc", default='/u/systems/UGE8.6.4/bin/lx-amd64/qsub',help="job submission command: default is /u/systems/UGE8.6.4/bin/lx-amd64/qsub")
 
@@ -62,7 +63,7 @@ def lmp2pos(ls,sel_nsw,copybs=False):
             target_path    = os.path.join(recal_path,str(i+1))                   
             ls.to_vasp_poscar(os.path.join(target_path,'POSCAR'),frame_idx=i)
             with open(os.path.join(inputfile,'INCAR')) as f:
-                content = f.read().replace('temperature', str(temp))
+                content = f.read().replace('temp_value', str(temp))
                 sigma_value = 8.6173303e-5 * temp
                 content = content.replace('sigma_value', f'{sigma_value:.4f}')
             tmp_incar_path = os.path.join(inputfile,'INCAR_tmp')
@@ -71,9 +72,27 @@ def lmp2pos(ls,sel_nsw,copybs=False):
             copy(tmp_incar_path,os.path.join(target_path,'INCAR'))
             copy(os.path.join(inputfile, 'KPOINTS'), target_path)
             os.symlink(os.path.join(inputfile, 'POTCAR'), os.path.join(target_path, 'POTCAR'))
-            # if run_vasp:
-            #     print("run vasp",target_path)
-            #     run(cwd,target_path)
+
+            if args.spin:
+                poscar_path = os.path.join(target_path, "POSCAR")
+                with open(poscar_path, "r") as f:
+                    lines = f.readlines()
+                atoms_per_species = lines[6].split()
+                Fe, Mg, Si, O = map(int, atoms_per_species)
+
+                magmom = f"{Fe}*2 {Mg}*0 {Si}*0 {O}*0"
+                nupdw = Fe * 2 + Mg * 0 + Si * 0 + O * 0
+
+                incar_path = os.path.join(target_path, "INCAR")
+                with open(incar_path, "r") as f:
+                    incar_content = f.read()
+
+                incar_content = incar_content.replace("magmom_value", magmom)
+                incar_content = incar_content.replace("nupdown_value", str(nupdw))
+
+                with open(incar_path, "w") as f:
+                    f.write(incar_content)
+
     os.remove(tmp_incar_path)
 
 # from subprocess import call
