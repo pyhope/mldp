@@ -21,7 +21,7 @@ parser.add_argument("--inputfile","-if",help="input files for vasp cal, default 
 parser.add_argument("--temperature","-t",default=4000,type=int,help="simulation temperature")
 parser.add_argument("--step","-s",default=1,type=int,help="step")
 parser.add_argument("--range","-r",type=str,help="0-2, means from 0 to 2, default is for all folders")
-parser.add_argument("--recal_dir_name","-rd",default='recal',help="recal directory name")
+parser.add_argument("--recal_dir_name","-rd",default='recal',help="Path to the recal directory")
 parser.add_argument("--spin","-sp",action='store_true',help="add magmom and nupdown (IS Fe) in INCAR, default is False")
 # parser.add_argument("--run_vasp","-rv",help="run vasp?, default without input is Yes")
 # parser.add_argument("--sub_command","-sc", default='/u/systems/UGE8.6.4/bin/lx-amd64/qsub',help="job submission command: default is /u/systems/UGE8.6.4/bin/lx-amd64/qsub")
@@ -134,7 +134,7 @@ if args.range:
    
 #for path in paths:
 #    print('###',path)
-recal_path = os.path.join(os.getcwd(), args.recal_dir_name)
+recal_path = args.recal_dir_name
 try:
     os.mkdir(recal_path)     
 except:
