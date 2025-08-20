@@ -136,7 +136,7 @@ if args.range:
 #    print('###',path)
 recal_path = args.recal_dir_name
 try:
-    os.mkdir(recal_path)     
+    os.makedirs(recal_path)     
 except:
     print('***recal exists in',recal_path)
 
