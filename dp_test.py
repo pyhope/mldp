@@ -200,3 +200,73 @@ def train_ener (inputs) :
                    header = 'data_vxx data_vxy data_vxz data_vyx data_vyy data_vyz data_vzx data_vzy data_vzz pred_vxx pred_vxy pred_vxz pred_vyx pred_vyy pred_vyz pred_vzx pred_vzy pred_vzz')        
     return numb_test,fparam[0][0],natoms, l2e, l2ea, l2f, l2v
 
+def train_force_by_type(inputs):
+    """
+    Evaluate training-set force L2 error for all atom types in one single dp.eval call.
+
+    Returns
+    -------
+    numb_test : int
+        Number of training frames.
+    fparam0 : float or None
+        fparam[0][0] if fparam exists, else None.
+    results : list of tuple
+        [(sel_type, natoms_sel, l2f_sel), ...]
+        sorted by sel_type
+    """
+
+    if inputs['rand_seed'] is not None:
+        np.random.seed(inputs['rand_seed'] % (2**32))
+
+    data = DataSets(inputs['system'], inputs['set_prefix'],
+                    shuffle_test=inputs['shuffle_test'])
+    train_data = get_train_data(data)
+
+    nframes = train_data["box"].shape[0]
+    numb_test = nframes
+
+    dp = DeepPot(inputs['model'])
+
+    coord = train_data["coord"].reshape([numb_test, -1])
+    box   = train_data["box"]
+    atype = np.array(train_data["type"][0], dtype=int)
+
+    if dp.get_dim_fparam() > 0:
+        fparam = train_data["fparam"]
+    else:
+        fparam = None
+
+    if dp.get_dim_aparam() > 0:
+        aparam = train_data["aparam"]
+    else:
+        aparam = None
+
+    ret = dp.eval(coord, box, atype, fparam=fparam, aparam=aparam, atomic=False)
+
+    force_pred = ret[1].reshape([numb_test, -1, 3])
+    force_ref  = train_data["force"].reshape([numb_test, -1, 3])
+
+    unique_types = sorted(np.unique(atype).tolist())
+    results = []
+
+    print("# number of train data     : %d" % numb_test)
+    print("# force error by atom type:")
+
+    for sel_type in unique_types:
+        atom_mask = (atype == sel_type)
+        natoms_sel = int(np.sum(atom_mask))
+
+        if natoms_sel == 0:
+            continue
+
+        force_pred_sel = force_pred[:, atom_mask, :]
+        force_ref_sel  = force_ref[:, atom_mask, :]
+
+        l2f_sel = l2err(force_pred_sel - force_ref_sel)
+        results.append((int(sel_type), natoms_sel, float(l2f_sel)))
+
+        print("#   type %d: natoms = %d, force_l2err = %e eV/A"
+              % (sel_type, natoms_sel, l2f_sel))
+
+    fparam0 = None if fparam is None else fparam[0][0]
+    return numb_test, fparam0, results
