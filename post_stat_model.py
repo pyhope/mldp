@@ -21,7 +21,7 @@ parser = argparse.ArgumentParser()
 ### MUST SET###
 parser.add_argument("--inputpath","-ip",help="input path file. support txt file, json file, default is cwd")
 parser.add_argument("-de", "--deepmd", type=str,default = 'deepmd',help="deepmd folder")
-parser.add_argument("-d", "--detail_file", type=str, 
+parser.add_argument("-d", "--detail_file", type=str, default="dp_test",
                         help="The file containing details of energy force and virial accuracy")
 parser.add_argument("-p", "--plot", default=False,action='store_true',
                         help="plot mode, default, False assuming ummarized file should exist. If True no file would generated")
@@ -32,6 +32,7 @@ args   = parser.parse_args()
 import numpy as np
 import os
 import matplotlib.pyplot as plt
+import re
 cwd    = os.getcwd()
 
 def rmse(org,pred): # same as dp_test l2err
@@ -45,6 +46,29 @@ def min_max(dat):
 
 def save(dat,name,header):
     np.savetxt(os.path.join(cwd,args.detail_file+name), dat, header = header)
+
+def read_type_map(deepmd_path):
+    type_map_file = os.path.join(deepmd_path, 'type_map.raw')
+    if not os.path.exists(type_map_file):
+        return []
+    with open(type_map_file) as fp:
+        return fp.read().split()
+
+def parse_train_force_by_element(logfile, deepmd_path):
+    type_map = read_type_map(deepmd_path)
+    type_force = {}
+    pattern = re.compile(
+        r'#\s*type\s+(\d+)\s*:\s*natoms\s*=\s*\d+\s*,\s*force_l2err\s*=\s*([0-9.eE+-]+)'
+    )
+    with open(logfile) as fp:
+        for line in fp:
+            match = pattern.search(line)
+            if not match:
+                continue
+            type_index = int(match.group(1))
+            element = type_map[type_index] if type_index < len(type_map) else 'type_{0}'.format(type_index)
+            type_force[element] = float(match.group(2))
+    return type_force
 
 def plot(e,f,v):
     fig, ax = plt.subplots(1,3,figsize=(14,4))
@@ -118,11 +142,10 @@ else:
 eV_A3_2_GPa  = 160.21766208 # 1 eV/Å3 = 160.2176621 GPa
 
 import csv
-file = open('stat_'+args.detail_file+'.csv', 'w', newline='')
 fieldnames = ['path','natoms','ntrain', 'ntest','fparam','e_tr','f_tr','v_tr',
               'e_ts','f_ts','v_ts']
-writer = csv.DictWriter(file,fieldnames=fieldnames)
-writer.writeheader()
+rows = []
+element_force_columns = []
     
 count = 0
 for path in paths:
@@ -209,6 +232,12 @@ for path in paths:
  
     log = np.loadtxt(logfile)
     logdict= {'path':path, 'natoms':log[0]}
+    train_force_by_element = parse_train_force_by_element(logfile, deepmd_path)
+    for element, value in train_force_by_element.items():
+        column = 'f_tr_{0}'.format(element)
+        logdict[column] = value
+        if column not in element_force_columns:
+            element_force_columns.append(column)
     
 #    writer.writerow({'path':path, 'natoms':log[0],'ntrain':log[2],
 #                         'ntest':log[8], 'fparam':log[1],
@@ -248,10 +277,13 @@ for path in paths:
             f_test_all = np.concatenate((f_test_all,f_test),axis=0)
             v_test_all = np.concatenate((v_test_all,v_test),axis=0); v_gpa_test_all = np.concatenate((v_gpa_test_all,v_gpa_test),axis=0)
             logdict['ntest']=log[2]; logdict['e_ts']=log[4];  logdict['f_ts']=log[5];  logdict['v_ts']=log[7];
-    writer.writerow(logdict)
+    rows.append(logdict)
     count += 1
 
-file.close()
+with open('stat_'+args.detail_file+'.csv', 'w', newline='') as file:
+    writer = csv.DictWriter(file, fieldnames=fieldnames + sorted(element_force_columns))
+    writer.writeheader()
+    writer.writerows(rows)
    
 
 if args.merge:

@@ -23,7 +23,8 @@ parser.add_argument("--temperature","-t",default=None,type=int,help="simulation 
 parser.add_argument("--step","-s",default=1,type=int,help="step")
 parser.add_argument("--range","-r",type=str,help="0-2, means from 0 to 2, default is for all folders")
 parser.add_argument("--recal_dir_name","-rd",default='recal',help="Path to the recal directory")
-parser.add_argument("--spin","-sp",action='store_true',help="add magmom and nupdown (IS Fe) in INCAR, default is False")
+parser.add_argument("--spin","-sp",action='store_true',help="add magmom and nupdown in INCAR, default is False")
+parser.add_argument("--Fe_mag_moment","-fmm",default=2,type=int,help="Fe magnetic moment, default is 2")
 parser.add_argument("--potcar_by_elements","-pe",action='store_true',help="generate POTCAR by elements, default is False")
 parser.add_argument("--calc_nband_from_nelec","-cn",action='store_true',help="calculate Nband from Nelec in POSCAR, default is False")
 
@@ -115,8 +116,8 @@ def lmp2pos(ls,sel_nsw,copybs=False):
             if args.spin:
                 Fe, Mg, Si, O = map(int, atoms_per_species)
 
-                magmom = f"{Fe}*2 {Mg}*0 {Si}*0 {O}*0"
-                nupdw = Fe * 2 + Mg * 0 + Si * 0 + O * 0
+                magmom = f"{Fe}*{args.Fe_mag_moment} {Mg}*0 {Si}*0 {O}*0"
+                nupdw = Fe * args.Fe_mag_moment + Mg * 0 + Si * 0 + O * 0
 
                 with open(incar_path, "r") as f:
                     incar_content = f.read()
